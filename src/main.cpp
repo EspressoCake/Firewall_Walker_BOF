@@ -180,6 +180,12 @@ int GetNumberOfRules()
     BeaconPrintf(CALLBACK_OUTPUT, "Number of rules: %d\n", fwRuleCount);
 
     CleanupRoutine:
+        // Release pFwRules
+        if (pFwRules != NULL)
+        {
+            pFwRules->Release();
+        }
+    
         // Release INetFwPolicy2, this will crash otherwise.
         if (pNetFwPolicy2 != NULL)
         {
