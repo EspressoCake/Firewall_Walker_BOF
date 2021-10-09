@@ -15,7 +15,7 @@ This shows that it's possible to use C++ classes/wrappers within `BOF` files, el
 ## What are the options this currently supports
 - Fetching the total number of known Windows firewall rules via: `fw_walk total`
 - Enumerating each of the three default locations for firewalls configurations (profile, domain, and public) via: `fw_walk status`
-- The ability to disable (assuming you have sufficient privileges) all three default firewalls (profile, domian, and public) via: `fw_walk enable`
+- The ability to disable (assuming you have sufficient privileges) all three default firewalls (profile, domian, and public) via: `fw_walk disable`
 - The ability to enable/revert your actions (assuming you have sufficient privileges) all three default firewalls (profile, domain, and public) via: `fw_walk enable`
 
 ## How do I run this?
