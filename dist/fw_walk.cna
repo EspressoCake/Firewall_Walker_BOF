@@ -17,6 +17,9 @@ alias fw_walk {
     $helpString =  $helpString . "total\n";
     $helpString =  $helpString . "Description: Get count of total discovered Windows firewall rules.\n";
     $helpString =  $helpString . "=====================================\n";
+    $helpString =  $helpString . "display\n";
+    $helpString =  $helpString . "Description: Display verbose output of all enabled rules associated with all profiles and applications (be careful).\n";
+    $helpString =  $helpString . "=====================================\n";
     $helpString =  $helpString . "disable_fw\n";
     $helpString =  $helpString . "Description: Disable public, domain, and profile firewall(s).\n";
     $helpString =  $helpString . "=====================================\n";
@@ -34,21 +37,25 @@ alias fw_walk {
         $data = readb($handle, -1);
         closef($handle);
 
-        if ( $2 ismatch "(?i)(status|total|disable|enable)") {
-            if ( $2 ismatch "(?i)(status)") {
+        if ( $2 ismatch "(?i)(status|total|disable|enable|display)") {
+            if ( $2 ismatch "(?i)(status)" ) {
                 beacon_inline_execute($1, $data, "GetFWStatus");
                 return;
             }
-            if ( $2 ismatch "(?i)(total)") {
+            if ( $2 ismatch "(?i)(total)" ) {
                 beacon_inline_execute($1, $data, "GetNumberOfRules");
                 return;
             }
-            if ( $2 ismatch "(?i)(disable)") {
+            if ( $2 ismatch "(?i)(disable)" ) {
                 beacon_inline_execute($1, $data, "DisableAllWindowsSoftwareFirewalls");
                 return;
             }
-            if ( $2 ismatch "(?i)(enable)") {
+            if ( $2 ismatch "(?i)(enable)" ) {
                 beacon_inline_execute($1, $data, "EnableAllWindowsSoftwareFirewalls");
+                return;
+            }
+            if ( $2 ismatch "(?i)(display)" ) {
+                beacon_inline_execute($1, $data, "AllRulesVerbose");
                 return;
             }
         } else {

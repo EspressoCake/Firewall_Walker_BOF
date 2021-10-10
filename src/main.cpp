@@ -4,8 +4,9 @@
 #include <comutil.h>
 #include <oaidl.h>
 #include <netfw.h>
-#include "headers/win32_api.h"
 #include "headers/cpp.h"
+#include "headers/fw_defs.h"
+#include "headers/win32_api.h"
 
 extern "C" { void        DisplayVanityBanner (); }
 extern "C" { int         GetFWStatus (); }
@@ -14,6 +15,8 @@ extern "C" { HRESULT     InitializeWindowsFirewallCOM(INetFwPolicy2** ppNetFwPol
 extern "C" { int         GetNumberOfRules (); }
 extern "C" { int         DisableAllWindowsSoftwareFirewalls (); }
 extern "C" { int         EnableAllWindowsSoftwareFirewalls (); }
+extern "C" { int         AllRulesVerbose (); }
+extern "C" { void        DumpFWRulesInCollection(INetFwRule* FwRule); }
 
 
 extern const GUID        CLSID_NetFwPolicy2;
@@ -355,4 +358,216 @@ int EnableAllWindowsSoftwareFirewalls()
         }
 
         return 0;
+}
+
+int AllRulesVerbose() 
+{
+    HRESULT hrComInit = S_OK;
+    HRESULT hr = S_OK;
+
+    ULONG cFetched = 0; 
+    VARIANT var;
+
+    IUnknown *pEnumerator;
+    IEnumVARIANT* pVariant = NULL;
+
+    INetFwPolicy2 *pNetFwPolicy2 = NULL;
+    INetFwRules *pFwRules = NULL;
+    INetFwRule *pFwRule = NULL;
+
+    long fwRuleCount;
+
+    DisplayVanityBanner();
+
+    // Best-practice, initialize our VARIANT
+    OLEAUT32$VariantInit(&var);
+
+    hrComInit = OLE32$CoInitializeEx(0, COINIT_APARTMENTTHREADED);
+
+    if (hrComInit != RPC_E_CHANGED_MODE)
+    {
+        if (FAILED(hrComInit))
+        {
+            BeaconPrintf(CALLBACK_ERROR, "CoInitializeEx failed: 0x%08lx\n", hrComInit);
+            goto CleanupRoutine;
+        }
+    }
+
+    hr = InitializeWindowsFirewallCOM(&pNetFwPolicy2);
+    if ( FAILED(hr) ) {
+        goto CleanupRoutine;
+    }
+
+    hr = pNetFwPolicy2->get_Rules(&pFwRules);
+    if ( FAILED(hr) ) {
+        BeaconPrintf(CALLBACK_ERROR, "Failed to retrieve rules.\n");
+        goto CleanupRoutine;
+    }
+
+    hr = pFwRules->get_Count(&fwRuleCount);
+    if ( FAILED(hr) ) {
+        BeaconPrintf(CALLBACK_ERROR, "Failed to get total rule count.\n");
+        goto CleanupRoutine;
+    }
+
+    pFwRules->get__NewEnum(&pEnumerator);
+    
+    if (pEnumerator) {
+        hr = pEnumerator->QueryInterface(g_IID_IEnumVARIANT, (void **)&pVariant);
+    } else {
+        BeaconPrintf(CALLBACK_ERROR, "Failed to get enumerator.\n");
+        goto CleanupRoutine;
+    }
+
+
+    while ( SUCCEEDED(hr) && hr != S_FALSE ) {
+        OLEAUT32$VariantClear(&var);
+        hr = pVariant->Next(1, &var, &cFetched);
+
+        if ( S_FALSE != hr ) {
+            if ( SUCCEEDED(hr) ) {
+                hr = OLEAUT32$VariantChangeType(&var, &var, 0, VT_DISPATCH);
+            } else {
+                BeaconPrintf(CALLBACK_ERROR, "Failed to chage variant type to VT_DISPATCH.\n");
+                goto CleanupRoutine;
+            }
+
+            if ( SUCCEEDED(hr) ) {
+                hr = (V_DISPATCH(&var))->QueryInterface(g_INetFwRule, (void **)&pFwRule);
+            } else {
+                BeaconPrintf(CALLBACK_ERROR, "Failed to query INetFwRule interface.\n");
+                goto CleanupRoutine;
+            }
+
+            if ( SUCCEEDED(hr) ) {
+                DumpFWRulesInCollection(pFwRule);
+            }
+        }
+    }
+
+    goto CleanupRoutine;
+
+    CleanupRoutine:
+        // Release pFwRule
+        if (pFwRule != NULL)
+        {
+            pFwRule->Release();
+        }
+
+        // Release INetFwPolicy2
+        if (pNetFwPolicy2 != NULL)
+        {
+            pNetFwPolicy2->Release();
+        }
+
+        // Uninitialize COM.
+        if (SUCCEEDED(hrComInit))
+        {
+            OLE32$CoUninitialize();
+        }
+    
+        return 0;
+}
+
+
+void DumpFWRulesInCollection(INetFwRule* FwRule)
+{
+    VARIANT_BOOL bEnabled;
+    BSTR bstrVal;
+
+    long lVal = 0;
+    long lProfileBitmask = 0;
+
+    NET_FW_RULE_DIRECTION fwDirection;
+    NET_FW_ACTION fwAction;
+
+    if ( SUCCEEDED(FwRule->get_Enabled(&bEnabled)) )
+    {
+        if (bEnabled)
+        {
+            if ( SUCCEEDED(FwRule->get_Name(&bstrVal)) ) 
+            {
+                if ( SHLWAPI$StrCmpW(bstrVal, L"(null)") >= 0 )
+                {
+                    BeaconPrintf(CALLBACK_OUTPUT, "\n======== ENABLED RULE DETECTED ========\n");
+                    BeaconPrintf(CALLBACK_OUTPUT, "Name:        %ls\n", (wchar_t*)bstrVal);
+                }
+            }
+
+            if ( SUCCEEDED(FwRule->get_Description(&bstrVal)) ) 
+            {
+                if ( SHLWAPI$StrCmpW(bstrVal, L"(null)") >= 0 )
+                {
+                    BeaconPrintf(CALLBACK_OUTPUT, "Description: %ls\n", (wchar_t*)bstrVal);
+                }
+            }
+
+            if ( SUCCEEDED(FwRule->get_ApplicationName(&bstrVal)) ) 
+            {
+                if ( SHLWAPI$StrCmpW(bstrVal, L"(null)") >= 0 )
+                {
+                    BeaconPrintf(CALLBACK_OUTPUT, "App Name:    %ls\n", (wchar_t*)bstrVal);
+                }
+            }
+
+            if ( SUCCEEDED(FwRule->get_ServiceName(&bstrVal)) ) 
+            {
+                if ( SHLWAPI$StrCmpW(bstrVal, L"(null)") >= 0 )
+                {
+                    BeaconPrintf(CALLBACK_OUTPUT, "Service:     %ls\n", (wchar_t*)bstrVal);
+                }
+            }
+
+            if ( SUCCEEDED(FwRule->get_Protocol(&lVal)) ) 
+            {
+                switch (lVal) 
+                {
+                    case NET_FW_IP_PROTOCOL_TCP:
+                        BeaconPrintf(CALLBACK_OUTPUT, "Protocol:    %ls\n", (wchar_t*)NET_FW_IP_PROTOCOL_TCP_NAME);
+                        break;
+                    case NET_FW_IP_PROTOCOL_UDP:
+                        BeaconPrintf(CALLBACK_OUTPUT, "Protocol:    %ls\n", (wchar_t*)NET_FW_IP_PROTOCOL_UDP_NAME);
+                        break;
+                    default:
+                        break;
+                }
+
+                if ( lVal != NET_FW_IP_VERSION_V4 && lVal != NET_FW_IP_VERSION_V6)
+                {
+                    if ( SUCCEEDED(FwRule->get_LocalPorts(&bstrVal)) )
+                    {
+                        if ( SHLWAPI$StrCmpW(bstrVal, L"(null)") >= 0 )
+                        {
+                            BeaconPrintf(CALLBACK_OUTPUT, "LPorts:      %ls\n", (wchar_t*)bstrVal); 
+                        }
+                    }
+
+                    if ( SUCCEEDED(FwRule->get_RemotePorts(&bstrVal)) )
+                    {
+                        if ( SHLWAPI$StrCmpW(bstrVal, L"(null)") >= 0 )
+                        {
+                            BeaconPrintf(CALLBACK_OUTPUT, "RPorts:      %ls\n", (wchar_t*)bstrVal);
+                        }
+                    }
+                }
+            }
+
+            if ( SUCCEEDED(FwRule->get_Direction(&fwDirection)) )
+            {
+                switch(fwDirection)
+                {
+                    case NET_FW_RULE_DIR_IN:
+                        BeaconPrintf(CALLBACK_OUTPUT, "Direction:   %ls\n", (wchar_t*)NET_FW_RULE_DIR_IN_NAME);
+                        break;
+
+                    case NET_FW_RULE_DIR_OUT:
+                        BeaconPrintf(CALLBACK_OUTPUT, "Direction:   %ls\n", (wchar_t*)NET_FW_RULE_DIR_OUT_NAME);
+                        break;
+                    
+                    default:
+                        break;
+                }
+            }
+        }
+    }
 }
