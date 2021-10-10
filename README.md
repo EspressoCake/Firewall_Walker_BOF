@@ -38,3 +38,7 @@ The sky's the limit:
 - Add a rule for your own application
 - Add a rule for an interface of your choosing
 - Delete rules at will
+
+
+## Special Thanks
+[@JohnLaTwC](https://twitter.com/JohnLaTwC), you're awesome for volunteering your time to ensure coding practices are upheld on both sides of the fence!
